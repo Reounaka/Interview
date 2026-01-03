@@ -9,10 +9,6 @@ provider "kubernetes" {
   host                   = "https://${var.cluster_endpoint}"
   token                  = data.google_client_config.default.access_token
   cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
-
-  experiments {
-    manifest_resource = true
-  }
 }
 
 # 1. Deployment

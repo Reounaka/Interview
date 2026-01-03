@@ -21,7 +21,7 @@ resource "google_compute_global_address" "external_lb_ip" {
 
 # 3. Wait for ServiceAttachment to be ready
 resource "time_sleep" "wait_for_service_attachment" {
-  create_duration = "30s"
+  create_duration = "300s"
 }
 
 # 4. PSC NEG
