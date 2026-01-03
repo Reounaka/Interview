@@ -4,9 +4,7 @@ locals {
 }
 
 # Deploy the hello application, internal LoadBalancer Service and PSC ServiceAttachment
-# using gcloud + kubectl. This avoids configuring the Kubernetes provider against
-# a cluster that is being created in the same apply, so a single terraform apply
-# can provision the whole demo.
+# using gcloud + kubectl.
 resource "null_resource" "deploy_psc_app" {
   provisioner "local-exec" {
     interpreter = ["bash", "-c"]
