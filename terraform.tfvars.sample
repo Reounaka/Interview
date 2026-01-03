@@ -1,0 +1,3 @@
+consumer_project_id = "your-consumer-project-id"
+producer_project_id = "your-producer-project-id"
+region              = "us-central1"
