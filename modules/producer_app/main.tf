@@ -57,7 +57,7 @@ resource "time_sleep" "wait_for_lb_ip" {
   depends_on      = [kubernetes_service_v1.internal_lb]
 }
 
-# 3. Service Attachment (Terraform via kubernetes_manifest, no kubectl)
+# 3. Service Attachment (Terraform via kubernetes_manifest)
 resource "kubernetes_manifest" "psc_attachment" {
   manifest = {
     apiVersion = "networking.gke.io/v1"
@@ -76,4 +76,34 @@ resource "kubernetes_manifest" "psc_attachment" {
     }
   }
   depends_on = [time_sleep.wait_for_lb_ip]
+}
+
+# 4. Fetch Service Attachment URL via gcloud (no kubectl)
+data "external" "service_attachment_url" {
+  program = [
+    "bash",
+    "-c",
+    <<-EOT
+      set -euo pipefail
+      name="${local.service_attachment_name}"
+      for i in $(seq 1 60); do
+        url=$(gcloud compute service-attachments list \
+          --project "${var.project_id}" \
+          --regions "${var.region}" \
+          --filter="description:k8sResource=\\\"/namespaces/default/serviceattachments/${local.service_attachment_name}\\\"" \
+          --format="value(selfLink)" \
+          | head -n1)
+        if [ -n "$url" ]; then
+          break
+        fi
+        sleep 10
+      done
+      if [ -z "$url" ]; then
+        echo "{}" >&2
+        exit 1
+      fi
+      jq -n --arg url "$url" '{url: $url}'
+    EOT
+  ]
+  depends_on = [kubernetes_manifest.psc_attachment]
 }
