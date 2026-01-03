@@ -1,3 +1,3 @@
 output "service_attachment_uri" {
-  value = data.external.service_attachment_url.result.url
+  value = kubernetes_manifest.psc_attachment.object.status.serviceAttachmentURL
 }
