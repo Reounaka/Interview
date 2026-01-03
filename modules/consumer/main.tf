@@ -1,11 +1,11 @@
-# 1. Create consumer VPC (Project A)
+# Consumer VPC that hosts the PSC client
 resource "google_compute_network" "vpc_a" {
   name                    = "vpc-a"
   auto_create_subnetworks = false
   project                 = var.project_id
 }
 
-# Subnet for consumer workloads and PSC endpoint
+# Subnet where the PSC NEG and backend live
 resource "google_compute_subnetwork" "subnet_consumer" {
   name          = "subnet-consumer"
   region        = var.region
@@ -14,18 +14,18 @@ resource "google_compute_subnetwork" "subnet_consumer" {
   project       = var.project_id
 }
 
-# 2. Reserve a global external IP for the HTTP load balancer
+# Reserved global IP address for the external HTTP load balancer
 resource "google_compute_global_address" "external_lb_ip" {
   name    = "external-lb-ip"
   project = var.project_id
 }
 
-# 3. Wait for the producer ServiceAttachment to become ready before creating the PSC NEG
+# Wait for the producer ServiceAttachment to be ready before attaching PSC NEG
 resource "time_sleep" "wait_for_service_attachment" {
   create_duration = "300s"
 }
 
-# 4. PSC Network Endpoint Group that connects to the producer ServiceAttachment
+# PSC NEG that connects the consumer VPC to the producer ServiceAttachment
 resource "google_compute_region_network_endpoint_group" "psc_neg" {
   name                  = "psc-neg-group"
   project               = var.project_id
@@ -38,7 +38,7 @@ resource "google_compute_region_network_endpoint_group" "psc_neg" {
   depends_on = [time_sleep.wait_for_service_attachment]
 }
 
-# 5. Simple Cloud Armor policy (allow all) attached to the backend service
+# Simple Cloud Armor policy (allow all traffic)
 resource "google_compute_security_policy" "block_bad_guys" {
   name    = "block-bad-guys"
   project = var.project_id
@@ -54,7 +54,7 @@ resource "google_compute_security_policy" "block_bad_guys" {
   }
 }
 
-# 6. External HTTP load balancer components
+# Backend service that uses the PSC NEG as its backend
 resource "google_compute_backend_service" "my_backend_service" {
   name                  = "my-backend-service"
   project               = var.project_id
@@ -68,18 +68,21 @@ resource "google_compute_backend_service" "my_backend_service" {
   }
 }
 
+# URL map routing all traffic to the backend service
 resource "google_compute_url_map" "my_url_map" {
   name            = "my-external-lb"
   project         = var.project_id
   default_service = google_compute_backend_service.my_backend_service.id
 }
 
+# HTTP proxy that fronts the URL map
 resource "google_compute_target_http_proxy" "my_http_proxy" {
   name    = "my-http-proxy"
   project = var.project_id
   url_map = google_compute_url_map.my_url_map.id
 }
 
+# Global forwarding rule exposing the HTTP load balancer on port 80
 resource "google_compute_global_forwarding_rule" "my_forwarding_rule" {
   name                  = "my-forwarding-rule"
   project               = var.project_id

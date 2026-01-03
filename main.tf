@@ -1,5 +1,4 @@
 terraform {
-  # Require a recent Terraform version and the Google provider
   required_version = ">= 1.3"
   required_providers {
     google = {
@@ -9,14 +8,12 @@ terraform {
   }
 }
 
-# Google provider for the consumer project (Project A)
 provider "google" {
   alias   = "consumer"
   project = var.consumer_project_id
   region  = var.region
 }
 
-# Google provider for the producer project (Project B)
 provider "google" {
   alias   = "producer"
   project = var.producer_project_id
@@ -80,7 +77,6 @@ module "consumer" {
   depends_on = [module.producer_app]
 }
 
-// Public IP of the external HTTP load balancer in the consumer project
 output "load_balancer_ip" {
   value = module.consumer.external_lb_ip
 }
