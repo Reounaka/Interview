@@ -14,7 +14,7 @@ Two GCP projects connected via Private Service Connect (PSC):
 - Root: provider wiring, module calls, outputs.
 - modules/setup: enable required Google APIs and wait.
 - modules/producer_infra: VPC B, subnets, Autopilot cluster, firewall.
-- modules/producer_app: deploy app, internal LB, PSC ServiceAttachment, poll for URL.
+- modules/producer_app: deploy app, internal LB, PSC ServiceAttachment (Terraform-only; no kubectl/polling).
 - modules/consumer: VPC A, PSC NEG, Cloud Armor, external HTTP LB.
 
 ## Apply flow
@@ -26,7 +26,7 @@ Two GCP projects connected via Private Service Connect (PSC):
 ## Prerequisites
 - Terraform >= 1.3
 - gcloud CLI authenticated to both projects
-- kubectl with access to the producer cluster API
+- Network/API access to the producer cluster for the Terraform Kubernetes provider
 - Two GCP projects with billing enabled
 
 ## Configure
@@ -52,7 +52,7 @@ terraform destroy -auto-approve
 If destroy complains about PSC attachments/subnets, wait a minute and rerun after the ServiceAttachment and PSC NEG are gone.
 
 ## Troubleshooting
-- ServiceAttachment URL can take a few minutes; the module polls until available.
-- Ensure kubectl can reach the producer cluster before apply (`gcloud container clusters get-credentials ...` then `kubectl get ns --request-timeout=5s`).
+- ServiceAttachment creation can take a few minutes; the URI is deterministic, but allow time for status to become ready.
+- Ensure Terraform’s Kubernetes provider can reach the producer cluster API (credentials from gcloud must have cluster access).
 
 
