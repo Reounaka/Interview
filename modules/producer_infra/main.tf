@@ -1,14 +1,15 @@
+// Producer project ID and deployment region
 variable "project_id" {}
 variable "region" {}
 
-# 1. VPC Network B
+# 1. VPC Network B for the producer project
 resource "google_compute_network" "vpc_b" {
   name                    = "vpc-b"
   auto_create_subnetworks = false
   project                 = var.project_id
 }
 
-# 2. GKE Subnet
+# 2. Subnet for the GKE Autopilot cluster
 resource "google_compute_subnetwork" "subnet_gke" {
   name          = "subnet-gke"
   region        = var.region
@@ -17,7 +18,7 @@ resource "google_compute_subnetwork" "subnet_gke" {
   project       = var.project_id
 }
 
-# 3. PSC NAT Subnet
+# 3. Subnet dedicated to PSC NAT traffic
 resource "google_compute_subnetwork" "psc_nat_subnet" {
   name          = "psc-nat-subnet"
   region        = var.region
@@ -27,7 +28,7 @@ resource "google_compute_subnetwork" "psc_nat_subnet" {
   project       = var.project_id
 }
 
-# 4. GKE Autopilot Cluster
+# 4. GKE Autopilot cluster that runs the producer application
 resource "google_container_cluster" "producer_cluster" {
   name     = "producer-cluster"
   location = var.region
@@ -42,7 +43,7 @@ resource "google_container_cluster" "producer_cluster" {
   deletion_protection = false
 }
 
-# 5. Firewall Rule (Allow PSC Ingress)
+# 5. Firewall rule allowing traffic from the PSC NAT subnet into the producer VPC
 resource "google_compute_firewall" "allow_psc_ingress" {
   name    = "allow-psc-ingress"
   network = google_compute_network.vpc_b.name

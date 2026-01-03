@@ -1,4 +1,5 @@
 terraform {
+  # Require a recent Terraform version and the Google provider
   required_version = ">= 1.3"
   required_providers {
     google = {
@@ -8,19 +9,21 @@ terraform {
   }
 }
 
+# Google provider for the consumer project (Project A)
 provider "google" {
   alias   = "consumer"
   project = var.consumer_project_id
   region  = var.region
 }
 
+# Google provider for the producer project (Project B)
 provider "google" {
   alias   = "producer"
   project = var.producer_project_id
   region  = var.region
 }
 
-# --- STEP 0: SETUP APIS ---
+# STEP 0: enable required APIs in both projects
 module "setup" {
   source = "./modules/setup"
   providers = {
@@ -31,7 +34,7 @@ module "setup" {
   producer_project_id = var.producer_project_id
 }
 
-# --- STEP 1: PRODUCER INFRASTRUCTURE ---
+# STEP 1: create producer networking, subnets and GKE Autopilot cluster
 module "producer_infra" {
   source = "./modules/producer_infra"
   providers = {
@@ -43,7 +46,7 @@ module "producer_infra" {
   depends_on = [module.setup]
 }
 
-# --- STEP 2: PRODUCER APPLICATION ---
+# STEP 2: deploy the producer application and PSC ServiceAttachment
 module "producer_app" {
   source = "./modules/producer_app"
 
@@ -64,7 +67,7 @@ module "producer_app" {
   depends_on = [module.producer_infra]
 }
 
-# --- STEP 3: CONSUMER ---
+# STEP 3: create consumer networking, PSC NEG and external HTTP load balancer
 module "consumer" {
   source = "./modules/consumer"
   providers = {
@@ -77,6 +80,7 @@ module "consumer" {
   depends_on = [module.producer_app]
 }
 
+// Public IP of the external HTTP load balancer in the consumer project
 output "load_balancer_ip" {
   value = module.consumer.external_lb_ip
 }

@@ -1,3 +1,4 @@
+// Producer project configuration and data needed to create the ServiceAttachment
 variable "project_id" {}
 variable "region" {}
 variable "psc_subnet_name" {}

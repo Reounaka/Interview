@@ -1,6 +1,8 @@
+// Project IDs for the consumer and producer
 variable "consumer_project_id" {}
 variable "producer_project_id" {}
 
+// List of Google APIs that must be enabled in both projects
 locals {
   services = [
     "compute.googleapis.com",
@@ -10,7 +12,7 @@ locals {
   ]
 }
 
-# Consumer API enablement
+# Enable required APIs in the consumer project
 resource "google_project_service" "consumer_apis" {
   provider           = google.consumer
   for_each           = toset(local.services)
@@ -19,7 +21,7 @@ resource "google_project_service" "consumer_apis" {
   disable_on_destroy = false
 }
 
-# Producer API enablement
+# Enable required APIs in the producer project
 resource "google_project_service" "producer_apis" {
   provider           = google.producer
   for_each           = toset(local.services)
@@ -28,7 +30,7 @@ resource "google_project_service" "producer_apis" {
   disable_on_destroy = false
 }
 
-# API activation wait
+# Wait for API activation to propagate before creating other resources
 resource "time_sleep" "wait_for_apis" {
   create_duration = "60s"
   depends_on = [

@@ -1,10 +1,11 @@
-# 1. VPC A
+# 1. Create consumer VPC (Project A)
 resource "google_compute_network" "vpc_a" {
   name                    = "vpc-a"
   auto_create_subnetworks = false
   project                 = var.project_id
 }
 
+# Subnet for consumer workloads and PSC endpoint
 resource "google_compute_subnetwork" "subnet_consumer" {
   name          = "subnet-consumer"
   region        = var.region
@@ -13,18 +14,18 @@ resource "google_compute_subnetwork" "subnet_consumer" {
   project       = var.project_id
 }
 
-# 2. External IP
+# 2. Reserve a global external IP for the HTTP load balancer
 resource "google_compute_global_address" "external_lb_ip" {
   name    = "external-lb-ip"
   project = var.project_id
 }
 
-# 3. Wait for ServiceAttachment to be ready
+# 3. Wait for the producer ServiceAttachment to become ready before creating the PSC NEG
 resource "time_sleep" "wait_for_service_attachment" {
   create_duration = "300s"
 }
 
-# 4. PSC NEG
+# 4. PSC Network Endpoint Group that connects to the producer ServiceAttachment
 resource "google_compute_region_network_endpoint_group" "psc_neg" {
   name                  = "psc-neg-group"
   project               = var.project_id
@@ -37,7 +38,7 @@ resource "google_compute_region_network_endpoint_group" "psc_neg" {
   depends_on = [time_sleep.wait_for_service_attachment]
 }
 
-# 5. Cloud Armor
+# 5. Simple Cloud Armor policy (allow all) attached to the backend service
 resource "google_compute_security_policy" "block_bad_guys" {
   name    = "block-bad-guys"
   project = var.project_id
@@ -53,7 +54,7 @@ resource "google_compute_security_policy" "block_bad_guys" {
   }
 }
 
-# 6. External Load Balancer (HTTP)
+# 6. External HTTP load balancer components
 resource "google_compute_backend_service" "my_backend_service" {
   name                  = "my-backend-service"
   project               = var.project_id

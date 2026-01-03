@@ -1,4 +1,6 @@
 terraform {
+  # Setup module uses the Google provider with two aliases (consumer, producer)
+  # and the time provider to wait for API activation.
   required_providers {
     google = {
       source  = "hashicorp/google"

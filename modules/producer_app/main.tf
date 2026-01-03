@@ -1,23 +1,24 @@
+// Name of the ServiceAttachment created on the producer GKE cluster
 locals {
   service_attachment_name = "my-psc-service"
 }
 
-# Deploy the app, ILB Service and PSC ServiceAttachment using gcloud + kubectl
-# This avoids configuring the Kubernetes provider with a cluster that
-# is being created in the same apply, so a single `terraform apply`
-# works for the interviewer.
+# Deploy the hello application, internal LoadBalancer Service and PSC ServiceAttachment
+# using gcloud + kubectl. This avoids configuring the Kubernetes provider against
+# a cluster that is being created in the same apply, so a single terraform apply
+# can provision the whole demo.
 resource "null_resource" "deploy_psc_app" {
   provisioner "local-exec" {
     interpreter = ["bash", "-c"]
     command     = <<-EOT
       set -euo pipefail
 
-      # Get credentials for the Autopilot GKE cluster
+      # Get kubeconfig credentials for the Autopilot GKE cluster
       gcloud container clusters get-credentials "producer-cluster" \
         --region "${var.region}" \
         --project "${var.project_id}"
 
-      # Deploy a simple hello app
+      # Deploy a simple hello HTTP application and expose it internally
       cat <<'EOF' | kubectl apply -f -
       apiVersion: apps/v1
       kind: Deployment
@@ -56,7 +57,7 @@ resource "null_resource" "deploy_psc_app" {
           protocol: TCP
       EOF
 
-      # Give GKE ILB some time to allocate an IP before attaching PSC
+      # Wait for the internal GKE LoadBalancer Service to receive an IP
       sleep 60
 
       # Create the ServiceAttachment CRD pointing at the internal LB Service
@@ -78,7 +79,7 @@ resource "null_resource" "deploy_psc_app" {
   }
 }
 
-# Fetch ServiceAttachment selfLink via gcloud command
+# Fetch the ServiceAttachment selfLink from GCP using gcloud
 data "external" "service_attachment_url" {
   program = [
     "bash",
