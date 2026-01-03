@@ -1,81 +1,81 @@
-# Providers and defaults
-data "google_client_config" "default" {}
-
 locals {
   service_attachment_name = "my-psc-service"
 }
 
-provider "kubernetes" {
-  host                   = "https://${var.cluster_endpoint}"
-  token                  = data.google_client_config.default.access_token
-  cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
-}
+# Deploy the app, ILB Service and PSC ServiceAttachment using gcloud + kubectl
+# This avoids configuring the Kubernetes provider with a cluster that
+# is being created in the same apply, so a single `terraform apply`
+# works for the interviewer.
+resource "null_resource" "deploy_psc_app" {
+  provisioner "local-exec" {
+    interpreter = ["bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
 
-# App deployment (hello server)
-resource "kubernetes_deployment_v1" "hello_server" {
-  metadata { name = "hello-server" }
-  spec {
-    replicas = 2
-    selector { match_labels = { app = "hello-server" } }
-    template {
-      metadata { labels = { app = "hello-server" } }
-      spec {
-        container {
-          image = "us-docker.pkg.dev/google-samples/containers/gke/hello-app:1.0"
-          name  = "hello-server"
-          port { container_port = 8080 }
-        }
-      }
-    }
-  }
-}
+      # Get credentials for the Autopilot GKE cluster
+      gcloud container clusters get-credentials "producer-cluster" \
+        --region "${var.region}" \
+        --project "${var.project_id}"
 
-# Internal Load Balancer Service (ILB)
-resource "kubernetes_service_v1" "internal_lb" {
-  metadata {
-    name = "internal-lb-service"
-    annotations = {
-      "networking.gke.io/load-balancer-type" = "Internal"
-      "networking.gke.io/internal-load-balancer-allow-global-access" = "true"
-    }
-  }
-  spec {
-    selector = { app = "hello-server" }
-    type     = "LoadBalancer"
-    port {
-      port        = 80
-      target_port = 8080
-      protocol    = "TCP"
-    }
-  }
-  depends_on = [kubernetes_deployment_v1.hello_server]
-}
+      # Deploy a simple hello app
+      cat <<'EOF' | kubectl apply -f -
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: hello-server
+      spec:
+        replicas: 2
+        selector:
+          matchLabels:
+            app: hello-server
+        template:
+          metadata:
+            labels:
+              app: hello-server
+          spec:
+            containers:
+            - name: hello-server
+              image: us-docker.pkg.dev/google-samples/containers/gke/hello-app:1.0
+              ports:
+              - containerPort: 8080
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: internal-lb-service
+        annotations:
+          networking.gke.io/load-balancer-type: "Internal"
+          networking.gke.io/internal-load-balancer-allow-global-access: "true"
+      spec:
+        type: LoadBalancer
+        selector:
+          app: hello-server
+        ports:
+        - port: 80
+          targetPort: 8080
+          protocol: TCP
+      EOF
 
-# Wait for ILB IP before creating the attachment
-resource "time_sleep" "wait_for_lb_ip" {
-  create_duration = "30s"
-  depends_on      = [kubernetes_service_v1.internal_lb]
-}
+      # Give GKE ILB some time to allocate an IP before attaching PSC
+      sleep 60
 
-# PSC ServiceAttachment CRD
-resource "kubernetes_manifest" "psc_attachment" {
-  manifest = {
-    apiVersion = "networking.gke.io/v1"
-    kind       = "ServiceAttachment"
-    metadata = {
-      name      = local.service_attachment_name
-      namespace = "default"
-    }
-    spec = {
-      connectionPreference = "ACCEPT_AUTOMATIC"
-      natSubnets           = [var.psc_subnet_url]
-      resourceRef = {
-        kind = "Service"
-        name = kubernetes_service_v1.internal_lb.metadata[0].name
-      }
-    }
+      # Create the ServiceAttachment CRD pointing at the internal LB Service
+      cat <<EOF | kubectl apply -f -
+      apiVersion: networking.gke.io/v1
+      kind: ServiceAttachment
+      metadata:
+        name: ${local.service_attachment_name}
+        namespace: default
+      spec:
+        connectionPreference: ACCEPT_AUTOMATIC
+        natSubnets:
+        - ${var.psc_subnet_url}
+        resourceRef:
+          kind: Service
+          name: internal-lb-service
+      EOF
+    EOT
   }
-  depends_on = [time_sleep.wait_for_lb_ip]
 }
 
 # Fetch ServiceAttachment selfLink via gcloud command
@@ -104,5 +104,5 @@ data "external" "service_attachment_url" {
       jq -n --arg url "$url" '{url: $url}'
     EOT
   ]
-  depends_on = [kubernetes_manifest.psc_attachment]
+  depends_on = [null_resource.deploy_psc_app]
 }

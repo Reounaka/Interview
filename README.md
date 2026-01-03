@@ -14,27 +14,37 @@ This project wires two GCP projects together via Private Service Connect (PSC):
 - Root: provider wiring, module calls, outputs.
 - modules/setup: enables required Google APIs and waits.
 - modules/producer_infra: network + Autopilot cluster + PSC NAT subnet + firewall.
-- modules/producer_app: deploys the app, internal LB, PSC ServiceAttachment (Terraform-only, no kubectl).
+- modules/producer_app: deploys the app, internal LB, PSC ServiceAttachment using a Terraform null_resource with gcloud + kubectl.
 - modules/consumer: PSC NEG, Cloud Armor, external HTTP LB.
 
 ## How to run
-1) Set `terraform.tfvars`:
+1) Clone and enter the repo:
 ```
-consumer_project_id = "<consumer-project>"
-producer_project_id = "<producer-project>"
+git clone https://github.com/Reounaka/Interview.git
+cd Interview
+```
+2) Set `terraform.tfvars` in the repo root:
+```
+consumer_project_id = "<CONSUMER_PROJECT_ID>"  # consumer project (A)
+producer_project_id = "<PRODUCER_PROJECT_ID>"  # producer project (B)
 region              = "us-central1"
 ```
-2) Apply:
+3) Authenticate with gcloud (same account must have access to both projects):
+```
+gcloud auth login
+gcloud config set project <PRODUCER_PROJECT_ID>
+```
+4) Apply:
 ```
 terraform init
-terraform apply -auto-approve
+terraform apply
 ```
-3) Grab the output `application_url` and open it in a browser.
+5) Grab the output `application_url` and open it in a browser or curl it.
 
 ## Prerequisites
 - Terraform >= 1.3
-- gcloud CLI authenticated to both projects
-- Network/API access to the producer cluster for the Terraform Kubernetes provider
+- gcloud CLI
+- kubectl
 - Two GCP projects with billing enabled
 
 ## Destroy
@@ -43,8 +53,8 @@ terraform destroy -auto-approve
 ```
 If you see errors about PSC attachments/subnets, wait a bit and rerun destroy after the ServiceAttachment and PSC NEG release.
 
-## Troubleshooting
+## Troubleshooting / notes
 - ServiceAttachment publishing can take a few minutes; the consumer NEG depends on it being ready.
-- Ensure the Terraform Kubernetes provider can reach the producer cluster API (credentials from gcloud must have cluster access).
+- The Kubernetes resources (Deployment, Service, ServiceAttachment) are created via `kubectl apply` from Terraform and are not tracked as Terraform resources.
 
 

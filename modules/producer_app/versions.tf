@@ -1,7 +1,7 @@
 terraform {
   required_providers {
-    kubernetes = { source = "hashicorp/kubernetes" }
-    google     = { source = "hashicorp/google" }
-    time       = { source = "hashicorp/time" }
+    google   = { source = "hashicorp/google" }
+    external = { source = "hashicorp/external" }
+    null     = { source = "hashicorp/null" }
   }
 }

@@ -58,6 +58,10 @@ module "producer_app" {
   providers = {
     google = google.producer
   }
+
+  # Ensure the GKE cluster and related infra are fully created
+  # before running the null_resource that uses gcloud/kubectl.
+  depends_on = [module.producer_infra]
 }
 
 # --- STEP 3: CONSUMER ---
