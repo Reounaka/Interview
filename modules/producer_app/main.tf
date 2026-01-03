@@ -1,4 +1,4 @@
-# --- Providers Internal Config ---
+# Providers and defaults
 data "google_client_config" "default" {}
 
 locals {
@@ -11,7 +11,7 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(var.cluster_ca_certificate)
 }
 
-# 1. Deployment
+# App deployment (hello server)
 resource "kubernetes_deployment_v1" "hello_server" {
   metadata { name = "hello-server" }
   spec {
@@ -30,7 +30,7 @@ resource "kubernetes_deployment_v1" "hello_server" {
   }
 }
 
-# 2. Internal Load Balancer
+# Internal Load Balancer Service (ILB)
 resource "kubernetes_service_v1" "internal_lb" {
   metadata {
     name = "internal-lb-service"
@@ -51,13 +51,13 @@ resource "kubernetes_service_v1" "internal_lb" {
   depends_on = [kubernetes_deployment_v1.hello_server]
 }
 
-# 2.5. Wait for LB to get IP
+# Wait for ILB IP before creating the attachment
 resource "time_sleep" "wait_for_lb_ip" {
   create_duration = "30s"
   depends_on      = [kubernetes_service_v1.internal_lb]
 }
 
-# 3. Service Attachment (Terraform via kubernetes_manifest)
+# PSC ServiceAttachment CRD
 resource "kubernetes_manifest" "psc_attachment" {
   manifest = {
     apiVersion = "networking.gke.io/v1"
@@ -78,7 +78,7 @@ resource "kubernetes_manifest" "psc_attachment" {
   depends_on = [time_sleep.wait_for_lb_ip]
 }
 
-# 4. Fetch Service Attachment URL via gcloud (no kubectl; match CRD description)
+# Fetch ServiceAttachment selfLink via gcloud command
 data "external" "service_attachment_url" {
   program = [
     "bash",
