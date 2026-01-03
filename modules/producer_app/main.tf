@@ -77,3 +77,32 @@ resource "kubernetes_manifest" "psc_attachment" {
   }
   depends_on = [time_sleep.wait_for_lb_ip]
 }
+
+# 4. Fetch Service Attachment URL via gcloud (no kubectl; match CRD description)
+data "external" "service_attachment_url" {
+  program = [
+    "bash",
+    "-c",
+    <<-EOT
+      set -euo pipefail
+      target="/namespaces/default/serviceattachments/${local.service_attachment_name}"
+      for i in $(seq 1 60); do
+        url=$(gcloud compute service-attachments list \
+          --project "${var.project_id}" \
+          --regions "${var.region}" \
+          --format="value(selfLink,description)" \
+          | awk -F"\t" -v t="$target" 'index($2,t){print $1; exit}')
+        if [ -n "$url" ]; then
+          break
+        fi
+        sleep 10
+      done
+      if [ -z "$url" ]; then
+        echo "{}" >&2
+        exit 1
+      fi
+      jq -n --arg url "$url" '{url: $url}'
+    EOT
+  ]
+  depends_on = [kubernetes_manifest.psc_attachment]
+}
