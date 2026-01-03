@@ -41,6 +41,8 @@ terraform apply
 ```
 5) Grab the output `application_url` and open it in a browser or curl it.
 
+Note: After Terraform finishes successfully, it can take 5–10 minutes until the website starts responding while the load balancer and PSC connections fully converge.
+
 ## Prerequisites
 - Terraform >= 1.3
 - gcloud CLI
